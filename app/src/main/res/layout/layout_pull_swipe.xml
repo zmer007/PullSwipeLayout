@@ -8,7 +8,16 @@
         android:id="@+id/pull_swipe_back"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#660"/>
+        android:background="#660">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:textColor="#400"
+            android:text="由LGD提供技术支持"/>
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/pull_swipe_content"

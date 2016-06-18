@@ -1,7 +1,6 @@
 package rubo.pullswipelayout;
 
 import android.content.Context;
-import android.os.Build;
 import android.os.Build.VERSION;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.NestedScrollingChild;
@@ -11,12 +10,11 @@ import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
-import android.view.animation.Animation.AnimationListener;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Transformation;
 import android.widget.AbsListView;
@@ -31,7 +29,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
     private static final float DECELERATE_INTERPOLATION_FACTOR = 2f;
 
-    private View mTarget; // the target of the gesture
+    private View mTarget;
     private OnRefreshListener mListener;
     private boolean mRefreshing = false;
     private int mTouchSlop;
@@ -55,12 +53,14 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     private boolean mNestedScrollInProgress;
 
     ViewGroup mContentContainer;
-    private boolean mReturningToStart;
 
     public PullSwipeLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
         final DisplayMetrics metrics = getResources().getDisplayMetrics();
         inflate(context, R.layout.layout_pull_swipe, this);
+
+        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+
         mContentContainer = (ViewGroup) findViewById(R.id.pull_swipe_content);
 
         mDecelerateInterpolator = new DecelerateInterpolator(DECELERATE_INTERPOLATION_FACTOR);
@@ -88,18 +88,15 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         ensureTarget();
 
         final int action = MotionEventCompat.getActionMasked(ev);
-        if (mReturningToStart && action == MotionEvent.ACTION_DOWN) {
-            mReturningToStart = false;
-        }
 
-        if (!isEnabled() || mReturningToStart || canChildScrollUp()
+        if (!isEnabled() || canChildScrollUp()
                 || mRefreshing || mNestedScrollInProgress) {
             return false;
         }
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
-                setTargetOffsetTopAndBottom(mContentContainer.getTop(), true);
+                setTargetOffsetTopAndBottom(-mContentContainer.getTop(), true);
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 mIsBeingDragged = false;
                 final float initialDownY = getMotionEventY(ev, mActivePointerId);
@@ -120,7 +117,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
                 }
                 final float yDiff = y - mInitialDownY;
                 if (yDiff > mTouchSlop && !mIsBeingDragged) {
-                    mInitialDownY = mInitialDownY + mTouchSlop;
+                    mInitialMotionY = mInitialDownY + mTouchSlop;
                     mIsBeingDragged = true;
                 }
                 break;
@@ -143,8 +140,6 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         final int pointerIndex = MotionEventCompat.getActionIndex(ev);
         final int pointerId = MotionEventCompat.getPointerId(ev, pointerIndex);
         if (pointerId == mActivePointerId) {
-            // This was our active pointer going up. Choose a new
-            // active pointer and adjust accordingly.
             final int newPointerIndex = pointerIndex == 0 ? 1 : 0;
             mActivePointerId = MotionEventCompat.getPointerId(ev, newPointerIndex);
         }
@@ -159,8 +154,6 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     }
 
     private void ensureTarget() {
-        // Don't bother getting the parent height if the parent hasn't been laid
-        // out yet.
         if (mTarget == null) {
             if (mContentContainer.getChildCount() != 1) {
                 throw new RuntimeException("PullSwipeLayout有且只有一个child");
@@ -186,8 +179,14 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        int pointerIndex = -1;
-        switch (event.getAction()) {
+        final int action = MotionEventCompat.getActionMasked(event);
+        int pointerIndex;
+
+        if (!isEnabled() || canChildScrollUp() || mNestedScrollInProgress) {
+            return false;
+        }
+
+        switch (action) {
             case MotionEvent.ACTION_DOWN:
                 mActivePointerId = MotionEventCompat.getPointerId(event, 0);
                 mIsBeingDragged = false;
@@ -229,9 +228,9 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
                 }
 
                 final float y = MotionEventCompat.getY(event, pointerIndex);
-                final float overscrollTop = (y - mInitialMotionY) * DRAG_RATE;
+                final float overScrollTop = (y - mInitialMotionY) * DRAG_RATE;
                 mIsBeingDragged = false;
-                finishContainer(overscrollTop);
+                finishContent(overScrollTop);
                 mActivePointerId = INVALID_POINTER;
                 return false;
             }
@@ -242,14 +241,13 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         return true;
     }
 
-    private void finishContainer(float overscrollTop) {
-        if (overscrollTop > mTotalDragDistance) {
+    private void finishContent(float overScrollTop) {
+//        if (overScrollTop > mTotalDragDistance) {
 //            setRefreshing(true, true /* notify */);
-        } else {
-            // cancel refresh
-            mRefreshing = false;
-            animateOffsetToStartPosition(mCurrentTargetOffsetTop);
-        }
+//        } else {
+        mRefreshing = false;
+        animateOffsetToStartPosition(mCurrentTargetOffsetTop);
+//        }
     }
 
     protected int mFrom;
@@ -271,7 +269,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     };
 
     private void moveToStart(float interpolatedTime) {
-        int targetTop = (mFrom + (int) (mFrom * interpolatedTime));
+        int targetTop = mFrom - (int) (mFrom * interpolatedTime);
         int offset = targetTop - mContentContainer.getTop();
         setTargetOffsetTopAndBottom(offset, false /* requires update */);
     }
@@ -288,7 +286,6 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         float originalDragPercent = overScrollTop / mTotalDragDistance;
 
         float dragPercent = Math.min(1f, Math.abs(originalDragPercent));
-        float adjustedPercent = (float) Math.max(dragPercent - .4, 0) * 5 / 3;
         float extraOS = Math.abs(overScrollTop) - mTotalDragDistance;
         float slingshotDist = mSpinnerFinalOffset;
         float tensionSlingshotPercent = Math.max(0, Math.min(extraOS, slingshotDist * 2) / slingshotDist);
@@ -298,6 +295,79 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         int targetY = (int) ((slingshotDist * dragPercent) + extraMove);
 
         setTargetOffsetTopAndBottom(targetY - mCurrentTargetOffsetTop, true);
+    }
+
+    @Override
+    public void requestDisallowInterceptTouchEvent(boolean b) {
+        if ((android.os.Build.VERSION.SDK_INT < 21 && mTarget instanceof AbsListView)
+                || (mTarget != null && !ViewCompat.isNestedScrollingEnabled(mTarget))) {
+            // no-op
+        } else {
+            super.requestDisallowInterceptTouchEvent(b);
+        }
+    }
+
+    @Override
+    public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
+        return isEnabled() && !mRefreshing
+                && (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+    }
+
+    @Override
+    public void onNestedScrollAccepted(View child, View target, int axes) {
+        mNestedScrollingParentHelper.onNestedScrollAccepted(child, target, axes);
+        startNestedScroll(axes & ViewCompat.SCROLL_AXIS_VERTICAL);
+        mTotalUnconsumed = 0;
+        mNestedScrollInProgress = true;
+    }
+
+    @Override
+    public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
+        if (dy > 0 && mTotalUnconsumed > 0) {
+            if (dy > mTotalUnconsumed) {
+                consumed[1] = dy - (int) mTotalUnconsumed;
+                mTotalUnconsumed = 0;
+            } else {
+                mTotalUnconsumed -= dy;
+                consumed[1] = dy;
+            }
+            moveContent(mTotalUnconsumed);
+        }
+
+        final int[] parentConsumed = mParentScrollConsumed;
+        if (dispatchNestedPreScroll(dx - consumed[0], dy - consumed[1], parentConsumed, null)) {
+            consumed[0] += parentConsumed[0];
+            consumed[1] += parentConsumed[1];
+        }
+    }
+
+    @Override
+    public int getNestedScrollAxes() {
+        return mNestedScrollingParentHelper.getNestedScrollAxes();
+    }
+
+    @Override
+    public void onStopNestedScroll(View target) {
+        mNestedScrollingParentHelper.onStopNestedScroll(target);
+        mNestedScrollInProgress = false;
+        if (mTotalUnconsumed > 0) {
+            finishContent(mTotalUnconsumed);
+            mTotalUnconsumed = 0;
+        }
+        stopNestedScroll();
+    }
+
+    @Override
+    public void onNestedScroll(final View target, final int dxConsumed, final int dyConsumed,
+                               final int dxUnconsumed, final int dyUnconsumed) {
+        dispatchNestedScroll(dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed,
+                mParentOffsetInWindow);
+
+        final int dy = dyUnconsumed + mParentOffsetInWindow[1];
+        if (dy < 0 && !canChildScrollUp()) {
+            mTotalUnconsumed += Math.abs(dy);
+            moveContent(mTotalUnconsumed);
+        }
     }
 
     @Override
