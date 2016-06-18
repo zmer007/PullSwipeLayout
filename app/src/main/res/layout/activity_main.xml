@@ -1,11 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rubo.pullswipelayout.PullSwipeLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/mainRecyclerView"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+    <TextView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="100dp"
+        android:gravity="center"
+        android:onClick="change"
+        android:text="!refreshing"
+        android:textSize="30sp"/>
+    <rubo.pullswipelayout.PullSwipeLayout
+        android:id="@+id/mainPullSwipeLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/mainRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
 
-</rubo.pullswipelayout.PullSwipeLayout>
+    </rubo.pullswipelayout.PullSwipeLayout>
+</LinearLayout>
