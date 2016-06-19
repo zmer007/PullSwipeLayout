@@ -6,7 +6,7 @@ import android.widget.FrameLayout;
 
 import rubo.pullswipelayout.R;
 
-public class LoadingWidget extends FrameLayout implements LoadingProgress {
+class LoadingWidget extends FrameLayout implements LoadingProgress {
 
     LoadingBall mLoadingBall;
 
