@@ -4,7 +4,7 @@
        android:layout_height="match_parent">
     <rubo.pullswipelayout.pullswipe.LoadingBall
         android:id="@+id/loading_widget_loadingBall"
-        android:layout_width="80dp"
+        android:layout_width="40dp"
         android:layout_height="30dp"
         android:layout_gravity="center"/>
 </merge>

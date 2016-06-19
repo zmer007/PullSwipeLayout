@@ -7,15 +7,15 @@ import android.graphics.Paint.Style;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.Animation;
-import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.view.animation.Transformation;
 
 class LoadingBall extends View implements LoadingProgress {
 
     static final float SCALE = .4f;
-    static final float MIN_SCALE = .2f;
+    static final float DELTA_SCALE = .2f;
 
-    static final long DURATION = 1200;
+    static final long DURATION = 900;
 
     static final int COLOR_1 = 0xff990000;
     static final int COLOR_2 = 0xff009900;
@@ -28,8 +28,7 @@ class LoadingBall extends View implements LoadingProgress {
     float mCurrentRadius;
 
     float mBaseRadius;
-    float mGrowRadiusDelta;
-    float mDeclineRadiusDelta;
+    float mDeltaRadius;
 
     float mProgress;
 
@@ -56,13 +55,12 @@ class LoadingBall extends View implements LoadingProgress {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        float rBallRadius = 2 * mBaseRadius - mCurrentRadius;
         if (change) {
-            float rBallRadius = mBaseRadius + mGrowRadiusDelta / 2;
             canvas.drawCircle(mCurrentCx, mHeight / 2, mCurrentRadius, mPaint1);
-            canvas.drawCircle(mWidth / 2, mHeight / 2, rBallRadius, mPaint2);
+            canvas.drawCircle(mWidth - mCurrentCx, mHeight / 2, rBallRadius, mPaint2);
         } else {
-            float rBallRadius = mBaseRadius + mGrowRadiusDelta / 2;
-            canvas.drawCircle(mWidth / 2, mHeight / 2, rBallRadius, mPaint2);
+            canvas.drawCircle(mWidth - mCurrentCx, mHeight / 2, rBallRadius, mPaint2);
             canvas.drawCircle(mCurrentCx, mHeight / 2, mCurrentRadius, mPaint1);
         }
     }
@@ -85,17 +83,17 @@ class LoadingBall extends View implements LoadingProgress {
 
     private void resetForegroundRadius(float progress) {
         if (progress < .5f) {
-            mCurrentRadius = mBaseRadius + mGrowRadiusDelta * 2 * progress;
+            mCurrentRadius = mBaseRadius + mDeltaRadius * 2 * progress;
         } else {
-            mCurrentRadius = mBaseRadius + mGrowRadiusDelta * 2 * (1 - progress);
+            mCurrentRadius = mBaseRadius + mDeltaRadius * 2 * (1 - progress);
         }
     }
 
     private void resetBackgroundRadius(float progress) {
         if (progress < .5f) {
-            mCurrentRadius = mBaseRadius - mDeclineRadiusDelta * 2 * progress;
+            mCurrentRadius = mBaseRadius - mDeltaRadius * 2 * progress;
         } else {
-            mCurrentRadius = mBaseRadius - mDeclineRadiusDelta * 2 * (1 - progress);
+            mCurrentRadius = mBaseRadius - mDeltaRadius * 2 * (1 - progress);
         }
     }
 
@@ -120,8 +118,7 @@ class LoadingBall extends View implements LoadingProgress {
             mHeight = MeasureSpec.getSize(heightMeasureSpec);
 
             mBaseRadius = mHeight / 2 * SCALE;
-            mGrowRadiusDelta = mHeight / 2 - mBaseRadius;
-            mDeclineRadiusDelta = mBaseRadius - mHeight / 2 * MIN_SCALE;
+            mDeltaRadius = mHeight / 2 * DELTA_SCALE;
 
             mCurrentRadius = mBaseRadius;
             mCurrentCx = mBaseRadius;
@@ -136,7 +133,7 @@ class LoadingBall extends View implements LoadingProgress {
 
         mProgressAnim.reset();
         mProgressAnim.setDuration(DURATION);
-        mProgressAnim.setInterpolator(new DecelerateInterpolator());
+        mProgressAnim.setInterpolator(new LinearInterpolator());
         mProgressAnim.setRepeatCount(Animation.INFINITE);
         clearAnimation();
         startAnimation(mProgressAnim);
