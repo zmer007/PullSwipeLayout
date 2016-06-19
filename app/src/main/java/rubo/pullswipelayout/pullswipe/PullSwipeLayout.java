@@ -10,7 +10,6 @@ import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -281,6 +280,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
                     (int) (mLDWFinalOffset - mCurrentLDWOffsetTop), true);
             mNotify = false;
             animateOffsetToCorrectPosition(mCurrentTargetOffsetTop, mCurrentLDWOffsetTop, mRefreshListener);
+            mLoadingWidget.startProgress();
         } else {
             setRefreshing(refreshing, false);
         }
@@ -405,7 +405,6 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         mContentContainer.offsetTopAndBottom(offset);
         mLoadingWidget.offsetTopAndBottom(offsetLDW);
 
-        Log.i("loading", mContentContainer.getTop() + " : " + mLoadingWidget.getTop());
         mCurrentTargetOffsetTop = mContentContainer.getTop();
         mCurrentLDWOffsetTop = mLoadingWidget.getTop();
 

@@ -1,21 +1,22 @@
 package rubo.pullswipelayout.pullswipe;
 
-import android.animation.Animator;
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.animation.LinearInterpolator;
+import android.view.animation.Animation;
+import android.view.animation.Animation.AnimationListener;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Transformation;
 
 class LoadingBall extends View implements LoadingProgress {
 
     static final float SCALE = .4f;
     static final float MIN_SCALE = .2f;
 
-    static final long DURATION = 800;
+    static final long DURATION = 1200;
 
     static final int COLOR_1 = 0xff990000;
     static final int COLOR_2 = 0xff009900;
@@ -107,6 +108,8 @@ class LoadingBall extends View implements LoadingProgress {
     @Override
     public void resetProgress() {
         isProgress = false;
+        mProgressAnim.reset();
+        clearAnimation();
         setProgress(0);
         invalidate();
     }
@@ -127,62 +130,30 @@ class LoadingBall extends View implements LoadingProgress {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
-    ObjectAnimator animator;
-    ObjectAnimator animator2;
 
     @Override
     public void startProgress() {
         isProgress = true;
 
-        if (animator == null) {
-            animator = ObjectAnimator.ofFloat(this, "progress", 0, 1);
-            animator2 = ObjectAnimator.ofFloat(this, "progress", 1, 0);
-        }
-
-        animator.setInterpolator(new LinearInterpolator());
-        animator.setDuration(DURATION);
-        animator.addListener(new SimpleAnimationListener() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                if (isProgress) {
-                    change = !change;
-                    animator2.start();
-                }
-            }
-        });
-        animator.start();
-
-        animator2.setInterpolator(new LinearInterpolator());
-        animator2.setDuration(DURATION);
-        animator2.addListener(new SimpleAnimationListener() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                if (isProgress) {
-                    change = !change;
-                    animator.start();
-                }
-            }
-        });
-        animator2.start();
+        mProgressAnim.reset();
+        mProgressAnim.setDuration(DURATION);
+        mProgressAnim.setInterpolator(new DecelerateInterpolator());
+        mProgressAnim.setRepeatCount(Animation.INFINITE);
+        clearAnimation();
+        startAnimation(mProgressAnim);
     }
 
-    class SimpleAnimationListener implements ObjectAnimator.AnimatorListener {
-
+    private final Animation mProgressAnim = new Animation() {
         @Override
-        public void onAnimationStart(Animator animation) {
+        public void applyTransformation(float interpolatedTime, Transformation t) {
+            if (interpolatedTime < .5f) {
+                change = false;
+                setProgress(interpolatedTime * 2);
+            } else {
+                change = true;
+                setProgress(2 - interpolatedTime * 2);
+            }
         }
-
-        @Override
-        public void onAnimationEnd(Animator animation) {
-        }
-
-        @Override
-        public void onAnimationCancel(Animator animation) {
-        }
-
-        @Override
-        public void onAnimationRepeat(Animator animation) {
-        }
-    }
+    };
 
 }
