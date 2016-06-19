@@ -11,7 +11,7 @@
         android:onClick="change"
         android:text="!refreshing"
         android:textSize="30sp"/>
-    <rubo.pullswipelayout.PullSwipeLayout
+    <rubo.pullswipelayout.pullswipe.PullSwipeLayout
         android:id="@+id/mainPullSwipeLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
@@ -20,5 +20,5 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
 
-    </rubo.pullswipelayout.PullSwipeLayout>
+    </rubo.pullswipelayout.pullswipe.PullSwipeLayout>
 </LinearLayout>

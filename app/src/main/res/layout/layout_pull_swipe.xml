@@ -15,9 +15,14 @@
             android:layout_gravity="top"
             android:layout_marginTop="10dp"
             android:gravity="center"
-            android:textColor="#400"
-            android:text="由LGD提供技术支持"/>
+            android:text="由LGD提供技术支持"
+            android:textColor="#400"/>
     </FrameLayout>
+
+    <rubo.pullswipelayout.pullswipe.LoadingWidget
+        android:id="@+id/pull_swipe_loadingWidget"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
     <FrameLayout
         android:id="@+id/pull_swipe_content"

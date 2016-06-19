@@ -7,7 +7,8 @@ import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.Toast;
 
-import rubo.pullswipelayout.PullSwipeLayout.OnRefreshListener;
+import rubo.pullswipelayout.pullswipe.PullSwipeLayout;
+import rubo.pullswipelayout.pullswipe.PullSwipeLayout.OnRefreshListener;
 
 public class MainActivity extends AppCompatActivity {
 

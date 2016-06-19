@@ -1,4 +1,4 @@
-package rubo.pullswipelayout;
+package rubo.pullswipelayout.pullswipe;
 
 import android.content.Context;
 import android.os.Build.VERSION;
@@ -10,6 +10,7 @@ import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -21,14 +22,18 @@ import android.view.animation.Transformation;
 import android.widget.AbsListView;
 import android.widget.FrameLayout;
 
+import rubo.pullswipelayout.R;
+
 public class PullSwipeLayout extends FrameLayout implements NestedScrollingParent, NestedScrollingChild {
 
     private static final float DRAG_RATE = .5f;
+    private static final float MARGIN_RATE = .25f;
     private static final int INVALID_POINTER = -1;
     private static final int DEFAULT_DRAG_DISTANCE = 64;
     private static final int ANIMATE_TO_START_DURATION = 200;
 
     private static final float DECELERATE_INTERPOLATION_FACTOR = 2f;
+
 
     private View mTarget;
     private OnRefreshListener mListener;
@@ -38,6 +43,8 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
     private float mSpinnerFinalOffset;
     private int mCurrentTargetOffsetTop;
+    private float mLDWFinalOffset;
+    private int mCurrentLDWOffsetTop;
 
     private float mInitialMotionY;
     private float mInitialDownY;
@@ -55,8 +62,11 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
 
     protected int mFrom;
+    protected int mFromLDW;
 
     ViewGroup mContentContainer;
+    LoadingWidget mLoadingWidget;
+
 
     public PullSwipeLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -66,11 +76,13 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
 
         mContentContainer = (ViewGroup) findViewById(R.id.pull_swipe_content);
+        mLoadingWidget = (LoadingWidget) findViewById(R.id.pull_swipe_loadingWidget);
 
         mDecelerateInterpolator = new DecelerateInterpolator(DECELERATE_INTERPOLATION_FACTOR);
 
         mTotalDragDistance = DEFAULT_DRAG_DISTANCE * metrics.density;
         mSpinnerFinalOffset = mTotalDragDistance;
+        mLDWFinalOffset = mSpinnerFinalOffset * MARGIN_RATE;
 
         mNestedScrollingParentHelper = new NestedScrollingParentHelper(this);
 
@@ -80,7 +92,9 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
     @Override
     public void addView(View child, ViewGroup.LayoutParams params) {
-        if (child.getId() == R.id.pull_swipe_back || child.getId() == R.id.pull_swipe_content) {
+        if (child.getId() == R.id.pull_swipe_back
+                || child.getId() == R.id.pull_swipe_content
+                || child.getId() == R.id.pull_swipe_loadingWidget) {
             super.addView(child, params);
         } else {
             mContentContainer.addView(child, params);
@@ -100,7 +114,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
-                setTargetOffsetTopAndBottom(-mContentContainer.getTop(), true);
+                setTargetOffsetTopAndBottom(-mContentContainer.getTop(), -mLoadingWidget.getTop(), true);
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 mIsBeingDragged = false;
                 final float initialDownY = getMotionEventY(ev, mActivePointerId);
@@ -167,7 +181,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     }
 
     public boolean canChildScrollUp() {
-        if (android.os.Build.VERSION.SDK_INT < 14) {
+        if (VERSION.SDK_INT < 14) {
             if (mTarget instanceof AbsListView) {
                 final AbsListView absListView = (AbsListView) mTarget;
                 return absListView.getChildCount() > 0
@@ -251,7 +265,7 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
             setRefreshing(true, true);
         } else {
             mRefreshing = false;
-            animateOffsetToStartPosition(mCurrentTargetOffsetTop);
+            animateOffsetToStartPosition(mCurrentTargetOffsetTop, mCurrentLDWOffsetTop);
         }
     }
 
@@ -263,9 +277,10 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         if (refreshing && !mRefreshing) {
             // scale and show
             mRefreshing = true;
-            setTargetOffsetTopAndBottom((int) (mSpinnerFinalOffset - mCurrentTargetOffsetTop), true);
+            setTargetOffsetTopAndBottom((int) (mSpinnerFinalOffset - mCurrentTargetOffsetTop),
+                    (int) (mLDWFinalOffset - mCurrentLDWOffsetTop), true);
             mNotify = false;
-            animateOffsetToCorrectPosition(mCurrentTargetOffsetTop, mRefreshListener);
+            animateOffsetToCorrectPosition(mCurrentTargetOffsetTop, mCurrentLDWOffsetTop, mRefreshListener);
         } else {
             setRefreshing(refreshing, false);
         }
@@ -277,15 +292,17 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
             ensureTarget();
             mRefreshing = refreshing;
             if (mRefreshing) {
-                animateOffsetToCorrectPosition(mCurrentTargetOffsetTop, mRefreshListener);
+                animateOffsetToCorrectPosition(mCurrentTargetOffsetTop, mCurrentLDWOffsetTop, mRefreshListener);
             } else {
-                animateOffsetToStartPosition(mCurrentTargetOffsetTop);
+                animateOffsetToStartPosition(mCurrentTargetOffsetTop, mCurrentLDWOffsetTop);
             }
         }
     }
 
-    private void animateOffsetToStartPosition(int from) {
+    private void animateOffsetToStartPosition(int from, int fromLDW) {
         mFrom = from;
+        mFromLDW = fromLDW;
+
         mAnimateToStartPosition.reset();
         mAnimateToStartPosition.setDuration(ANIMATE_TO_START_DURATION);
         mAnimateToStartPosition.setInterpolator(mDecelerateInterpolator);
@@ -294,8 +311,10 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
         mContentContainer.startAnimation(mAnimateToStartPosition);
     }
 
-    private void animateOffsetToCorrectPosition(int from, AnimationListener listener) {
+    private void animateOffsetToCorrectPosition(int from, int fromLDW, AnimationListener listener) {
         mFrom = from;
+        mFromLDW = fromLDW;
+
         mAnimateToCorrectPosition.reset();
         mAnimateToCorrectPosition.setDuration(ANIMATE_TO_START_DURATION);
         if (listener != null) {
@@ -319,12 +338,16 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
             int endTarget = (int) mSpinnerFinalOffset;
             int targetTop = (mFrom + (int) ((endTarget - mFrom) * interpolatedTime));
             int offset = targetTop - mContentContainer.getTop();
-            setTargetOffsetTopAndBottom(offset, false /* requires update */);
+
+            int endTargetLDW = (int) mLDWFinalOffset;
+            int targetTopLDW = (mFromLDW + (int) ((endTargetLDW - mFromLDW) * interpolatedTime));
+            int offsetLDW = targetTopLDW - mLoadingWidget.getTop();
+            setTargetOffsetTopAndBottom(offset, offsetLDW, false /* requires update */);
         }
     };
 
     private boolean mNotify;
-    private Animation.AnimationListener mRefreshListener = new AnimationListener() {
+    private AnimationListener mRefreshListener = new AnimationListener() {
         @Override
         public void onAnimationStart(Animation animation) {
         }
@@ -335,9 +358,11 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
                 if (mNotify) {
                     if (mListener != null) {
                         mListener.onRefresh();
+                        mLoadingWidget.startProgress();
                     }
                 }
                 mCurrentTargetOffsetTop = mContentContainer.getTop();
+                mCurrentLDWOffsetTop = mLoadingWidget.getTop();
             } else {
                 reset();
             }
@@ -349,26 +374,41 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     };
 
     private void reset() {
+        mLoadingWidget.resetProgress();
         mContentContainer.clearAnimation();
-        setTargetOffsetTopAndBottom(-mCurrentTargetOffsetTop, true);
+        setTargetOffsetTopAndBottom(-mCurrentTargetOffsetTop, -mCurrentLDWOffsetTop, true);
         mCurrentTargetOffsetTop = mContentContainer.getTop();
+        mCurrentLDWOffsetTop = mLoadingWidget.getTop();
     }
 
     private void moveToStart(float interpolatedTime) {
         int targetTop = mFrom - (int) (mFrom * interpolatedTime);
         int offset = targetTop - mContentContainer.getTop();
-        setTargetOffsetTopAndBottom(offset, false /* requires update */);
+
+        int targetTopLDW = mFromLDW - (int) (mFromLDW * interpolatedTime);
+        int offsetLDW = targetTopLDW - mLoadingWidget.getTop();
+
+        setTargetOffsetTopAndBottom(offset, offsetLDW, false /* requires update */);
     }
 
     private void moveToCorrect(float interpolatedTime) {
         int targetTop = (int) (mSpinnerFinalOffset - mSpinnerFinalOffset * interpolatedTime);
         int offset = targetTop - mContentContainer.getTop();
-        setTargetOffsetTopAndBottom(offset, false /* requires update */);
+
+        int targetTopLDW = (int) (mLDWFinalOffset - mLDWFinalOffset * interpolatedTime);
+        int offsetLDW = targetTopLDW - mLoadingWidget.getTop();
+
+        setTargetOffsetTopAndBottom(offset, offsetLDW, false /* requires update */);
     }
 
-    private void setTargetOffsetTopAndBottom(int offset, boolean requiresUpdate) {
+    private void setTargetOffsetTopAndBottom(int offset, int offsetLDW, boolean requiresUpdate) {
         mContentContainer.offsetTopAndBottom(offset);
+        mLoadingWidget.offsetTopAndBottom(offsetLDW);
+
+        Log.i("loading", mContentContainer.getTop() + " : " + mLoadingWidget.getTop());
         mCurrentTargetOffsetTop = mContentContainer.getTop();
+        mCurrentLDWOffsetTop = mLoadingWidget.getTop();
+
         if (requiresUpdate && VERSION.SDK_INT < 11) {
             invalidate();
         }
@@ -386,12 +426,24 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
 
         int targetY = (int) ((slingshotDist * dragPercent) + extraMove);
 
-        setTargetOffsetTopAndBottom(targetY - mCurrentTargetOffsetTop, true);
+
+        float originalDragPercentLDW = overScrollTop / mTotalDragDistance;
+
+        float dragPercentLDW = Math.min(1f, Math.abs(originalDragPercentLDW));
+        float extraOSLDW = Math.abs(overScrollTop) - mTotalDragDistance;
+        float slingshotDistLDW = mLDWFinalOffset;
+        float tensionSlingshotPercentLDW = Math.max(0, Math.min(extraOSLDW, slingshotDistLDW * 2) / slingshotDistLDW);
+        float tensionPercentLDW = (float) ((tensionSlingshotPercentLDW / 4) - Math.pow((tensionSlingshotPercentLDW / 4), 2)) * 2f;
+        float extraMoveLDW = slingshotDistLDW * tensionPercentLDW * 2;
+
+        int targetYLDW = (int) ((slingshotDistLDW * dragPercentLDW) + extraMoveLDW);
+
+        setTargetOffsetTopAndBottom(targetY - mCurrentTargetOffsetTop, targetYLDW - mCurrentLDWOffsetTop, true);
     }
 
     @Override
     public void requestDisallowInterceptTouchEvent(boolean b) {
-        if ((android.os.Build.VERSION.SDK_INT < 21 && mTarget instanceof AbsListView)
+        if ((VERSION.SDK_INT < 21 && mTarget instanceof AbsListView)
                 || (mTarget != null && !ViewCompat.isNestedScrollingEnabled(mTarget))) {
             // no-op
         } else {
@@ -526,6 +578,6 @@ public class PullSwipeLayout extends FrameLayout implements NestedScrollingParen
     }
 
     public interface OnRefreshListener {
-        public void onRefresh();
+        void onRefresh();
     }
 }
