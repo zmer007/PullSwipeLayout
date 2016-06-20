@@ -7,7 +7,8 @@
         android:layout_width="wrap_content"
         android:layout_height="100dp"
         android:layout_gravity="center"
-        android:text="i'm the one"
+        android:text="i'm ok"
+        android:textColor="#999"
         android:textSize="30sp"/>
 
 </FrameLayout>
